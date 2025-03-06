@@ -1,15 +1,5 @@
 import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
-import {
-  getAccessToken,
-  setAccessToken,
-  getRefreshToken,
-  setRefreshToken,
-  getSessionState,
-  setSessionState,
-  clearSession,
-  hasActiveSession,
-  getTokenExpiry
-} from '../utils/tokenStorage';
+import * as api from '../utils/api';
 
 interface User {
   id: string;
@@ -18,15 +8,20 @@ interface User {
   role: string;
 }
 
+// Define API response interfaces
+interface AuthResponse {
+  user: User;
+  token?: string;
+}
+
 interface AuthContextType {
   user: User | null;
   isAuthenticated: boolean;
   loading: boolean;
   error: string | null;
   login: (username: string, password: string) => Promise<void>;
-  logout: () => void;
+  logout: () => Promise<void>;
   clearError: () => void;
-  refreshAccessToken: () => Promise<boolean>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -48,37 +43,25 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
-  const [tokenExpiryTime, setTokenExpiryTime] = useState<number | null>(null);
 
-  // Initialize auth state from persisted session
+  // Initialize auth state by checking if user is already authenticated
   useEffect(() => {
     const initializeAuth = async () => {
       try {
         setLoading(true);
         
-        // Check if we have a session stored
-        const session = getSessionState();
-        
-        if (session) {
-          // If we have a stored session, try to refresh the token
-          const refreshed = await refreshAccessToken();
-          
-          if (refreshed) {
-            // If refresh was successful, set the user from the session
-            setUser({
-              id: session.userId,
-              username: session.username,
-              role: session.role,
-              email: `${session.username}@example.com` // Default email format
-            });
-          } else {
-            // If refresh failed, clear the session
-            clearSession();
-          }
+        // Check current authentication status using API
+        const response = await api.get<User>('/users/me', true);
+        if (response.success && response.data) {
+          setUser(response.data);
+        } else {
+          // Clear user if the server doesn't recognize them
+          setUser(null);
         }
       } catch (error) {
         console.error('Error initializing auth:', error);
-        clearSession();
+        // If this fails, the user is not authenticated or token is invalid
+        setUser(null);
       } finally {
         setLoading(false);
       }
@@ -87,75 +70,23 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
     initializeAuth();
   }, []);
 
-  // Set up token refresh mechanism
-  useEffect(() => {
-    // Skip if no token expiry or no user
-    if (!tokenExpiryTime || !user) {
-      return;
-    }
-
-    // Calculate time until token expires (with 1-minute buffer)
-    const timeUntilExpiry = tokenExpiryTime - Date.now() - 60000;
-    
-    // If token is already expired or will expire in less than a minute, refresh it now
-    if (timeUntilExpiry <= 0) {
-      refreshAccessToken();
-      return;
-    }
-
-    // Set up timer to refresh token before it expires
-    const refreshTimer = setTimeout(() => {
-      refreshAccessToken();
-    }, timeUntilExpiry);
-
-    return () => {
-      clearTimeout(refreshTimer);
-    };
-  }, [tokenExpiryTime, user]);
-
   const login = async (username: string, password: string) => {
     try {
       setLoading(true);
       setError(null);
       
-      const response = await fetch('http://localhost:3000/api/auth/login', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({ username, password })
-      });
+      const response = await api.post<AuthResponse>(
+        '/auth/login', 
+        { username, password }, 
+        false
+      );
 
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.message || 'Authentication failed');
+      if (!response.success || !response.data) {
+        throw new Error(response.message || 'Authentication failed');
       }
 
-      if (!data.success) {
-        throw new Error(data.message || 'Authentication failed');
-      }
-
-      const { accessToken, refreshToken } = data.data.tokens;
-      
-      // Get token expiry from the JWT payload
-      const expiry = getTokenExpiry(accessToken);
-      
-      // Store tokens securely
-      setAccessToken(accessToken);
-      setRefreshToken(refreshToken);
-      setTokenExpiryTime(expiry);
-      
       // Set user data from response
-      setUser(data.data.user);
-      
-      // Create and store session state
-      setSessionState({
-        userId: data.data.user.id,
-        username: data.data.user.username,
-        role: data.data.user.role,
-        expiresAt: Date.now() + (7 * 24 * 60 * 60 * 1000) // 7 days
-      });
+      setUser(response.data.user);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Login failed');
       throw err;
@@ -164,51 +95,16 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
     }
   };
 
-  const refreshAccessToken = async (): Promise<boolean> => {
-    const storedRefreshToken = getRefreshToken();
-    
-    if (!storedRefreshToken) {
-      return false;
-    }
-
+  const logout = async () => {
     try {
-      const response = await fetch('http://localhost:3000/api/auth/refresh', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({ refreshToken: storedRefreshToken })
-      });
-
-      if (!response.ok) {
-        throw new Error('Failed to refresh token');
-      }
-
-      const data = await response.json();
-      
-      if (!data.success || !data.data.accessToken) {
-        throw new Error('Invalid response from refresh endpoint');
-      }
-
-      // Get token expiry from the JWT payload
-      const expiry = getTokenExpiry(data.data.accessToken);
-      
-      // Update token in storage
-      setAccessToken(data.data.accessToken);
-      setTokenExpiryTime(expiry);
-      
-      return true;
+      // Call logout endpoint
+      await api.post('/auth/logout', {}, true);
     } catch (error) {
-      console.error('Token refresh failed:', error);
-      return false;
+      console.error('Error during logout:', error);
+    } finally {
+      // Clear user state regardless of server response
+      setUser(null);
     }
-  };
-
-  const logout = () => {
-    // Clear all stored tokens and session data
-    clearSession();
-    setUser(null);
-    setTokenExpiryTime(null);
   };
 
   const clearError = () => {
@@ -222,8 +118,7 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
     error,
     login,
     logout,
-    clearError,
-    refreshAccessToken
+    clearError
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

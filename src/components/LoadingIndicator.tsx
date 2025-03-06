@@ -16,19 +16,36 @@ const LoadingIndicator = ({ message = 'Loading...' }: LoadingIndicatorProps) => 
         flexDirection: 'column',
         alignItems: 'center',
         justifyContent: 'center',
-        minHeight: '100vh',
-        p: 3
+        position: 'fixed',
+        top: 0,
+        left: 0,
+        right: 0,
+        bottom: 0,
+        width: '100%',
+        height: '100vh',
+        p: 3,
+        zIndex: 9999,
+        margin: 0
       }}
     >
-      <CircularProgress size={60} thickness={4} />
-      {message && (
-        <Typography 
-          variant="h6" 
-          sx={{ mt: 3, fontWeight: 500, color: 'text.secondary' }}
-        >
-          {message}
-        </Typography>
-      )}
+      <Box
+        sx={{
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          justifyContent: 'center'
+        }}
+      >
+        <CircularProgress size={60} thickness={4} />
+        {message && (
+          <Typography 
+            variant="h6" 
+            sx={{ mt: 3, fontWeight: 500, color: 'text.secondary', textAlign: 'center' }}
+          >
+            {message}
+          </Typography>
+        )}
+      </Box>
     </Box>
   );
 };
