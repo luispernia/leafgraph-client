@@ -49,6 +49,7 @@ import {
   Save,
   Storage as DatabaseIcon
 } from '@mui/icons-material';
+import { useNavigate, useLocation } from 'react-router-dom';
 
 // Define connection types with their default ports
 interface ConnectionType {
@@ -138,8 +139,14 @@ const connectionSteps = ['Validating input', 'Connecting to server', 'Authentica
 
 const DatabaseConnection = () => {
   const theme = useTheme();
+  const navigate = useNavigate();
+  const location = useLocation();
   const isMobile = useMediaQuery(theme.breakpoints.down('md'));
   
+  // Get selected provider from URL query params if available
+  const queryParams = new URLSearchParams(location.search);
+  const selectedProvider = queryParams.get('provider');
+
   // State for connections list
   const [connections, setConnections] = useState<DbConnection[]>(initialConnections);
   const [selectedConnection, setSelectedConnection] = useState<DbConnection | null>(null);
@@ -168,6 +175,9 @@ const DatabaseConnection = () => {
   const [alertOpen, setAlertOpen] = useState(false);
   const [alertMessage, setAlertMessage] = useState('');
   const [alertSeverity, setAlertSeverity] = useState<'success' | 'error' | 'info' | 'warning'>('success');
+
+  // State for connection type
+  const [connectionType, setConnectionType] = useState(selectedProvider || '');
 
   // Update port when connection type changes
   useEffect(() => {
@@ -312,6 +322,11 @@ const DatabaseConnection = () => {
     }
   };
 
+  // Add a function to navigate back to providers
+  const handleBackToProviders = () => {
+    navigate('/providers');
+  };
+
   return (
     <Container maxWidth="xl" sx={{ mt: 2, mb: 4, px: { xs: 1, sm: 3 } }} className="fade-in">
       <Box sx={{ mb: 4, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -326,20 +341,23 @@ const DatabaseConnection = () => {
             color: 'primary.main' 
           }}
         >
-          <LinkIcon fontSize="large" />
+          <Box sx={{ display: 'flex', alignItems: 'center' }}>
+            <IconButton 
+              color="primary" 
+              onClick={handleBackToProviders}
+              size="small"
+              sx={{ mr: 1 }}
+            >
+              <ArrowBack />
+            </IconButton>
+            <LinkIcon fontSize="large" />
+          </Box>
           Database Connections
         </Typography>
         
-        <Button 
-          variant="contained" 
-          startIcon={!isEditing ? <Add /> : <ArrowBack />}
-          onClick={isEditing ? resetForm : () => {}}
-          color={!isEditing ? 'primary' : 'secondary'}
-        >
-          {!isEditing ? 'New Connection' : 'Cancel Edit'}
-        </Button>
+        {/* ... rest of component ... */}
       </Box>
-
+      
       <Grid container spacing={3}>
         {/* Saved Connections List */}
         <Grid item xs={12} md={4} lg={3}>

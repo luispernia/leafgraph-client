@@ -9,6 +9,7 @@ import {
 import { 
   DashboardOutlined, 
   LinkOutlined,
+  StorageOutlined
 } from '@mui/icons-material';
 import { useAuth } from '../context/AuthContext';
 import Header from '../components/Header';
@@ -85,6 +86,11 @@ const AuthLayout = () => {
       page: 'dashboard' 
     },
     { 
+      text: 'Providers', 
+      icon: <StorageOutlined />, 
+      page: 'providers' 
+    },
+    { 
       text: 'Connections', 
       icon: <LinkOutlined />, 
       page: 'connections' 
@@ -101,9 +107,7 @@ const AuthLayout = () => {
       {/* AppBar/Header */}
       <Header
         title="LeafGraph" 
-        onMenuToggle={handleDrawerToggle} 
-        onThemeToggle={handleThemeToggle} 
-        darkMode={darkMode}
+        onMenuToggle={handleDrawerToggle}
       />
       
       {/* Drawer component */}

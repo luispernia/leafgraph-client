@@ -8,6 +8,7 @@ import RootLayout from '../layouts/RootLayout';
 import NotFoundPage from '../pages/NotFoundPage';
 import { lazy, Suspense } from 'react';
 import { Box, CircularProgress } from '@mui/material';
+import ProvidersView from '../components/ProvidersView';
 
 // Lazy load the AuthLayout to avoid circular dependencies
 const AuthLayout = lazy(() => import('../layouts/AuthLayout'));
@@ -46,6 +47,10 @@ export const routes: RouteObject[] = [
           {
             path: 'dashboard',
             element: <Dashboard title='Dashboard' />,
+          },
+          {
+            path: 'providers',
+            element: <ProvidersView />,
           },
           {
             path: 'connections',
